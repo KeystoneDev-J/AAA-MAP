@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>AAA Coverage Map</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    #map { height: 90vh; width: 100%; }
+    .legend {
+      background: white;
+      padding: 10px;
+      line-height: 1.5;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    .legend i {
+      width: 18px;
+      height: 18px;
+      float: left;
+      margin-right: 8px;
+      opacity: 0.7;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    // Initialize the map
+    var map = L.map('map').setView([37.8, -96], 4);
+
+    // Add tile layer to the map
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    // State coordinates for markers
+    var stateCoordinates = {
+      'California': [36.7783, -119.4179],
+      'Pennsylvania': [41.2033, -77.1945],
+      'Ohio': [40.4173, -82.9071],
+      'Kentucky': [37.8393, -84.2700],
+      'West Virginia': [38.5976, -80.4549],
+      'New York': [40.7128, -74.0060],
+      'Colorado': [39.5501, -105.7821],
+      'Florida': [27.9944, -81.7603],
+      'Georgia': [32.1656, -82.9001],
+      'Illinois': [40.6331, -89.3985],
+      'Indiana': [40.2672, -86.1349],
+      'Iowa': [41.8780, -93.0977],
+      'Michigan': [44.3148, -85.6024],
+      'Minnesota': [46.7296, -94.6859],
+      'Nebraska': [41.4925, -99.9018],
+      'North Carolina': [35.7596, -79.0193],
+      'North Dakota': [47.5515, -101.0020],
+      'South Carolina': [33.8361, -81.1637],
+      'Tennessee': [35.5175, -86.5804],
+      'Wisconsin': [43.7844, -88.7879],
+      'Puerto Rico': [18.2208, -66.5901],
+      'Arizona': [34.0489, -111.0937],
+      'Connecticut': [41.6032, -73.0877],
+      'Delaware': [38.9108, -75.5277],
+      'Maryland': [39.0458, -76.6413],
+      'Montana': [46.8797, -110.3626],
+      'Nevada': [38.8026, -116.4194],
+      'Oklahoma': [35.4676, -97.5164],
+      'Oregon': [43.8041, -120.5542],
+      'South Dakota': [43.9695, -99.9018],
+      'Utah': [39.3200, -111.0937],
+      'Washington DC': [38.9072, -77.0369],
+      'Wyoming': [43.07597, -107.2903],
+      'Idaho': [44.0682, -114.7420],
+      'Kansas': [39.0119, -98.4842],
+      'New Jersey': [40.0583, -74.4057],
+      'Virginia': [37.4316, -78.6569]
+    };
+
+    // Define coverage data
+    var coverageData = {
+      "AAA - ACE Southern California": ["California"],
+      "AAA East Central": ["Pennsylvania", "Ohio", "Kentucky", "West Virginia", "New York"],
+      "Auto Club Group (ACG)": ["Colorado", "Florida", "Georgia", "Illinois", "Indiana", "Iowa", "Michigan", "Minnesota", "Nebraska", "North Carolina", "North Dakota", "South Carolina", "Tennessee", "Wisconsin", "Puerto Rico"],
+      "CSAA Insurance Group": ["Arizona", "Colorado", "Connecticut", "Delaware", "Maryland", "Montana", "Nevada", "Oklahoma", "Oregon", "South Dakota", "Utah", "Washington DC", "Wyoming", "California", "Idaho", "Indiana", "Kansas", "Kentucky", "New Jersey", "New York", "Ohio", "Pennsylvania", "Virginia", "West Virginia"]
+    };
+
+    // Define colors for each company
+    var colors = {
+      "AAA - ACE Southern California": "red",
+      "AAA East Central": "purple",
+      "Auto Club Group (ACG)": "green",
+      "CSAA Insurance Group": "orange"
+    };
+
+    // Function to get color based on company
+    function getColor(companies) {
+      if (companies.length == 1) {
+        return colors[companies[0]];
+      } else {
+        return 'blue'; // Color for overlapping coverage
+      }
+    }
+
+    // Add coverage data to the map
+    for (var company in coverageData) {
+      for (var i = 0; i < coverageData[company].length; i++) {
+        var state = coverageData[company][i];
+        if (stateCoordinates[state]) {
+          L.circleMarker(stateCoordinates[state], {
+            radius: 10,
+            color: getColor([company]),
+            fillColor: getColor([company]),
+            fillOpacity: 0.7
+          }).bindPopup(state + ": " + company).addTo(map);
+        }
+      }
+    }
+
+    // Handle overlapping states
+    var overlappingStates = ["California", "Indiana", "Kentucky", "New York", "Ohio", "Pennsylvania", "West Virginia"];
+    overlappingStates.forEach(state => {
+      var companies = [];
+      for (var company in coverageData) {
+        if (coverageData[company].includes(state)) {
+          companies.push(company);
+        }
+      }
+      if (stateCoordinates[state]) {
+        L.circleMarker(stateCoordinates[state], {
+          radius: 10,
+          color: getColor(companies),
+          fillColor: getColor(companies),
+          fillOpacity: 0.7
+        }).bindPopup(state + ": " + companies.join(", ")).addTo(map);
+      }
+    });
+
+    // Add a legend
+    var legend = L.control({ position: 'bottomright' });
+
+    legend.onAdd = function (map) {
+      var div = L.DomUtil.create('div', 'legend');
+      var labels = [];
+      for (var company in colors) {
+        labels.push(
+          '<i style="background:' + colors[company] + '"></i> ' + company
+        );
+      }
+      labels.push('<i style="background:blue"></i> Overlapping Coverage');
+      div.innerHTML = '<b>Legend</b><br>' + labels.join('<br>');
+      return div;
+    };
+
+    legend.addTo(map);
+  </script>
+</body>
+</html>
