@@ -2,45 +2,27 @@
 <html>
 <head>
   <title>AAA Coverage Map</title>
-  <meta charset="utf-8">
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
-    #map { height: 90vh; width: 100%; }
-    .legend {
-      background: white;
-      padding: 10px;
-      line-height: 1.5;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-    }
-    .legend i {
-      width: 18px;
-      height: 18px;
-      float: left;
-      margin-right: 8px;
-      opacity: 0.7;
-    }
-    .legend span {
-      font-size: 14px;
-    }
+    #map { height: 800px; width: 100%; }
+    .legend { background: white; padding: 10px; line-height: 1.5; position: absolute; bottom: 30px; right: 30px; z-index: 1000; }
   </style>
 </head>
 <body>
+  <h1>AAA Coverage Map</h1>
   <div id="map"></div>
+  <div class="legend" id="legend"></div>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet-pattern/leaflet.pattern.js"></script>
-  <script src="https://d3js.org/d3.v6.min.js"></script>
+  <script src="https://unpkg.com/d3@7"></script>
   <script>
-    // Initialize the map
     var map = L.map('map').setView([37.8, -96], 4);
 
-    // Add tile layer to the map
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
-    // Define coverage data
     var coverageData = {
       "AAA - ACE Southern California": ["California"],
       "AAA East Central": ["Pennsylvania", "Ohio", "Kentucky", "West Virginia", "New York"],
@@ -48,70 +30,92 @@
       "CSAA Insurance Group": ["Arizona", "Colorado", "Connecticut", "Delaware", "Maryland", "Montana", "Nevada", "Oklahoma", "Oregon", "South Dakota", "Utah", "Washington DC", "Wyoming", "California", "Idaho", "Indiana", "Kansas", "Kentucky", "New Jersey", "New York", "Ohio", "Pennsylvania", "Virginia", "West Virginia"]
     };
 
-    // Define colors for each company
     var colors = {
       "AAA - ACE Southern California": "red",
-      "AAA East Central": "purple",
+      "AAA East Central": "blue",
       "Auto Club Group (ACG)": "green",
-      "CSAA Insurance Group": "orange"
+      "CSAA Insurance Group": "purple"
     };
 
-    // Fetch GeoJSON data for states
-    d3.json('path/to/us-states.geojson').then(function(geojson) {
-      // Add the GeoJSON layer to the map
-      L.geoJson(geojson, {
-        style: function(feature) {
-          var state = feature.properties.name;
-          var companies = [];
-          for (var company in coverageData) {
-            if (coverageData[company].includes(state)) {
-              companies.push(company);
-            }
-          }
-          return {
-            fillColor: getColor(companies),
-            weight: 2,
-            opacity: 1,
-            color: 'white',
-            dashArray: '3',
-            fillOpacity: 0.7
-          };
-        },
-        onEachFeature: function(feature, layer) {
-          var state = feature.properties.name;
-          var companies = [];
-          for (var company in coverageData) {
-            if (coverageData[company].includes(state)) {
-              companies.push(company);
-            }
-          }
-          layer.bindPopup(state + ": " + companies.join(", "));
-        }
-      }).addTo(map);
-    });
-
-    // Function to get color based on companies
     function getColor(companies) {
       if (companies.length === 1) {
         return colors[companies[0]];
       } else {
-        return 'blue'; // Color for overlapping coverage
+        // Generate striped pattern for overlapping coverage
+        return `url(#pattern-${companies.join('-')})`;
       }
     }
 
-    // Add a legend
+    function style(feature) {
+      var companies = [];
+      for (var company in coverageData) {
+        if (coverageData[company].includes(feature.properties.name)) {
+          companies.push(company);
+        }
+      }
+      return {
+        fillColor: getColor(companies),
+        weight: 2,
+        opacity: 1,
+        color: 'white',
+        dashArray: '3',
+        fillOpacity: 0.7
+      };
+    }
+
+    function onEachFeature(feature, layer) {
+      var companies = [];
+      for (var company in coverageData) {
+        if (coverageData[company].includes(feature.properties.name)) {
+          companies.push(company);
+        }
+      }
+      layer.bindPopup(feature.properties.name + ": " + companies.join(", "));
+    }
+
+    function createPattern(svg, companies) {
+      var id = `pattern-${companies.join('-')}`;
+      var pattern = svg.append('pattern')
+        .attr('id', id)
+        .attr('width', 10)
+        .attr('height', 10)
+        .attr('patternUnits', 'userSpaceOnUse')
+        .attr('patternTransform', 'rotate(45)');
+      
+      companies.forEach((company, i) => {
+        pattern.append('rect')
+          .attr('width', 10)
+          .attr('height', 10 / companies.length)
+          .attr('y', (10 / companies.length) * i)
+          .attr('fill', colors[company]);
+      });
+    }
+
+    d3.json('https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json').then(function(geojson) {
+      var svg = d3.select(map.getPanes().overlayPane).append('svg');
+      var defs = svg.append('defs');
+
+      for (var company in coverageData) {
+        if (coverageData[company].length > 1) {
+          createPattern(defs, coverageData[company]);
+        }
+      }
+
+      L.geoJson(geojson, {
+        style: style,
+        onEachFeature: onEachFeature
+      }).addTo(map);
+    });
+
     var legend = L.control({ position: 'bottomright' });
 
-    legend.onAdd = function(map) {
+    legend.onAdd = function (map) {
       var div = L.DomUtil.create('div', 'legend');
       var labels = [];
       for (var company in colors) {
-        labels.push(
-          '<i style="background:' + colors[company] + '"></i> ' + company
-        );
+        labels.push('<i style="background:' + colors[company] + '"></i> ' + company);
       }
-      labels.push('<i style="background:blue"></i> Overlapping Coverage');
-      div.innerHTML = '<b>Legend</b><br>' + labels.join('<br>');
+      div.innerHTML = labels.join('<br>');
       return div;
     };
 
